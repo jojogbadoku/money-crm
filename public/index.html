@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Money CRM — Daily Received &amp; Expenses</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --income: #16a34a;
+    --income-bg: #eafbf1;
+    --expense: #dc2626;
+    --expense-bg: #fdecec;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --sheet-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1d2025;
+      --text: #e8e9ec;
+      --muted: #9aa0aa;
+      --border: #2d3138;
+      --income: #4ade80;
+      --income-bg: #12291c;
+      --expense: #f87171;
+      --expense-bg: #2c1616;
+      --accent: #818cf8;
+      --accent-hover: #9aa4fb;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+      --sheet-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+  }
+
+  /* Phone-shaped app shell, centered on any screen */
+  .app {
+    width: 100%;
+    max-width: 430px;
+    min-height: 100vh;
+    background: var(--bg);
+    position: relative;
+    padding-bottom: 100px;
+    display: none;
+  }
+  .app.visible { display: block; }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg);
+    padding: 18px 16px 10px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 2px; }
+  .subtitle { color: var(--muted); margin: 0; font-size: 0.82rem; }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 4px 16px 14px;
+  }
+  .stat.balance {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .stat.balance .label { color: rgba(255,255,255,0.8); }
+  .stat.balance .value { font-size: 1.9rem; }
+  .stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow);
+  }
+  .stat .label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+  .stat .value { font-size: 1.15rem; font-weight: 700; }
+  .stat.received .value { color: var(--income); }
+  .stat.expenses .value { color: var(--expense); }
+
+  .section-title {
+    padding: 4px 16px;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .filters {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px 10px;
+    overflow-x: auto;
+  }
+  .filters select, .filters input {
+    flex: none;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.82rem;
+  }
+  .filters .export {
+    margin-left: auto;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .list {
+    padding: 4px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .row {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow);
+  }
+  .row .icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex: none;
+  }
+  .row.income .icon { background: var(--income-bg); color: var(--income); }
+  .row.expense .icon { background: var(--expense-bg); color: var(--expense); }
+  .row .info { flex: 1; min-width: 0; }
+  .row .desc {
+    font-size: 0.92rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row .date { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+  .row .amount { font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
+  .row.income .amount { color: var(--income); }
+  .row.expense .amount { color: var(--expense); }
+  .row .del-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 1rem;
+    padding: 6px;
+    line-height: 1;
+    flex: none;
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 16px;
+    font-size: 0.88rem;
+  }
+
+  /* Floating add button */
+  .fab {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 398px;
+    height: 54px;
+    border-radius: 16px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(79,70,229,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    z-index: 20;
+  }
+  .fab:hover { background: var(--accent-hover); }
+  .fab .plus { font-size: 1.3rem; line-height: 1; }
+
+  /* Bottom sheet */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 100%);
+    width: 100%;
+    max-width: 430px;
+    background: var(--card);
+    border-radius: 20px 20px 0 0;
+    box-shadow: var(--sheet-shadow);
+    z-index: 31;
+    padding: 10px 20px 24px;
+    transition: transform 0.25s ease;
+  }
+  .sheet.open { transform: translate(-50%, 0); }
+  .sheet-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin: 6px auto 14px;
+  }
+  .sheet h2 { font-size: 1.05rem; margin: 0 0 16px; }
+  .type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .type-toggle button {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .type-toggle button.active[data-type="income"] {
+    background: var(--income-bg);
+    border-color: var(--income);
+    color: var(--income);
+  }
+  .type-toggle button.active[data-type="expense"] {
+    background: var(--expense-bg);
+    border-color: var(--expense);
+    color: var(--expense);
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .field input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 1rem;
+  }
+  .field input:focus { outline: none; border-color: var(--accent); }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .btn-save {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .btn-cancel {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  /* Login screen */
+  .login-screen {
+    width: 100%;
+    max-width: 430px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24px;
+  }
+  .login-screen.hidden { display: none; }
+  .login-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .login-card h1 { font-size: 1.2rem; margin: 0 0 4px; }
+  .login-card p { color: var(--muted); font-size: 0.85rem; margin: 0 0 20px; }
+  .login-card input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 1.3rem;
+    text-align: center;
+    letter-spacing: 0.3em;
+    margin-bottom: 12px;
+  }
+  .login-card input:focus { outline: none; border-color: var(--accent); }
+  .login-card button {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .login-error {
+    color: var(--expense);
+    font-size: 0.82rem;
+    margin: 10px 0 0;
+    min-height: 1em;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>Money CRM</h1>
+    <p>Enter your PIN to continue</p>
+    <form id="loginForm">
+      <input type="password" id="pinInput" inputmode="numeric" autocomplete="off" placeholder="••••" required>
+      <button type="submit">Unlock</button>
+      <p class="login-error" id="loginError"></p>
+    </form>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Money CRM</h1>
+      <p class="subtitle">Track daily money received and expenses</p>
+    </div>
+    <button class="logout-btn" id="logoutBtn">Log out</button>
+  </header>
+
+  <div class="summary">
+    <div class="stat balance">
+      <div class="label">Balance</div>
+      <div class="value" id="balance">$0.00</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat received">
+        <div class="label">Received</div>
+        <div class="value" id="totalReceived">$0.00</div>
+      </div>
+      <div class="stat expenses">
+        <div class="label">Expenses</div>
+        <div class="value" id="totalExpenses">$0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Transactions</div>
+  <div class="filters">
+    <select id="filterType">
+      <option value="all">All types</option>
+      <option value="income">Received</option>
+      <option value="expense">Expenses</option>
+    </select>
+    <input type="month" id="filterMonth">
+    <button class="export" id="exportBtn" type="button">Export CSV</button>
+  </div>
+
+  <div class="list" id="list"></div>
+  <div class="empty" id="emptyState" style="display:none;">No transactions yet. Tap + to add one.</div>
+</div>
+
+<button class="fab" id="fabBtn" aria-label="Add transaction" style="display:none;"><span class="plus">+</span> Add Transaction</button>
+
+<div class="overlay" id="overlay"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <h2>Add Transaction</h2>
+  <form id="entryForm">
+    <div class="type-toggle" id="typeToggle">
+      <button type="button" class="active" data-type="income">Money Received</button>
+      <button type="button" data-type="expense">Expense</button>
+    </div>
+    <div class="field">
+      <label for="date">Date</label>
+      <input type="date" id="date" required>
+    </div>
+    <div class="field">
+      <label for="desc">Description</label>
+      <input type="text" id="desc" placeholder="e.g. Client payment" required>
+    </div>
+    <div class="field">
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" placeholder="0.00" step="0.01" min="0" inputmode="decimal" required>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="btn-cancel" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn-save">Save</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  let entries = [];
+  let currentType = 'income';
+
+  const loginScreen = document.getElementById('loginScreen');
+  const loginForm = document.getElementById('loginForm');
+  const pinInput = document.getElementById('pinInput');
+  const loginError = document.getElementById('loginError');
+  const appEl = document.getElementById('app');
+  const fabBtn = document.getElementById('fabBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  const form = document.getElementById('entryForm');
+  const dateInput = document.getElementById('date');
+  const descInput = document.getElementById('desc');
+  const amountInput = document.getElementById('amount');
+  const list = document.getElementById('list');
+  const emptyState = document.getElementById('emptyState');
+  const filterType = document.getElementById('filterType');
+  const filterMonth = document.getElementById('filterMonth');
+  const exportBtn = document.getElementById('exportBtn');
+  const overlay = document.getElementById('overlay');
+  const sheet = document.getElementById('sheet');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const typeToggle = document.getElementById('typeToggle');
+
+  dateInput.value = new Date().toISOString().slice(0, 10);
+
+  function formatCurrency(n) {
+    return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  async function checkAuth() {
+    const res = await fetch('/api/me');
+    const data = await res.json();
+    if (data.authenticated) {
+      showApp();
+    } else {
+      showLogin();
+    }
+  }
+
+  function showLogin() {
+    loginScreen.classList.remove('hidden');
+    appEl.classList.remove('visible');
+    fabBtn.style.display = 'none';
+    pinInput.focus();
+  }
+
+  async function showApp() {
+    loginScreen.classList.add('hidden');
+    appEl.classList.add('visible');
+    fabBtn.style.display = 'flex';
+    await fetchEntries();
+  }
+
+  loginForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    loginError.textContent = '';
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pinInput.value })
+    });
+    if (res.ok) {
+      pinInput.value = '';
+      showApp();
+    } else {
+      loginError.textContent = 'Incorrect PIN, try again.';
+      pinInput.value = '';
+      pinInput.focus();
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    showLogin();
+  });
+
+  function openSheet() {
+    overlay.classList.add('open');
+    sheet.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSheet() {
+    overlay.classList.remove('open');
+    sheet.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  fabBtn.addEventListener('click', openSheet);
+  cancelBtn.addEventListener('click', closeSheet);
+  overlay.addEventListener('click', closeSheet);
+
+  typeToggle.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-type]');
+    if (!btn) return;
+    currentType = btn.dataset.type;
+    typeToggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  });
+
+  async function fetchEntries() {
+    const res = await fetch('/api/entries');
+    if (res.status === 401) {
+      showLogin();
+      return;
+    }
+    entries = await res.json();
+    render();
+  }
+
+  function render() {
+    const typeFilter = filterType.value;
+    const monthFilter = filterMonth.value;
+
+    const filtered = entries.filter(e => {
+      if (typeFilter !== 'all' && e.type !== typeFilter) return false;
+      if (monthFilter && !e.date.startsWith(monthFilter)) return false;
+      return true;
+    });
+
+    const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+    list.innerHTML = '';
+    emptyState.style.display = sorted.length ? 'none' : 'block';
+
+    for (const e of sorted) {
+      const row = document.createElement('div');
+      row.className = `row ${e.type}`;
+      row.innerHTML = `
+        <div class="icon">${e.type === 'income' ? '↓' : '↑'}</div>
+        <div class="info">
+          <div class="desc">${escapeHtml(e.desc)}</div>
+          <div class="date">${e.date}</div>
+        </div>
+        <div class="amount">${e.type === 'income' ? '+' : '-'}${formatCurrency(e.amount)}</div>
+        <button class="del-btn" title="Delete" data-id="${e.id}">✕</button>
+      `;
+      list.appendChild(row);
+    }
+
+    list.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.id);
+        await fetch(`/api/entries/${id}`, { method: 'DELETE' });
+        entries = entries.filter(e => e.id !== id);
+        render();
+      });
+    });
+
+    const totalReceived = entries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
+    const totalExpenses = entries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
+    document.getElementById('totalReceived').textContent = formatCurrency(totalReceived);
+    document.getElementById('totalExpenses').textContent = formatCurrency(totalExpenses);
+    document.getElementById('balance').textContent = formatCurrency(totalReceived - totalExpenses);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const amount = parseFloat(amountInput.value);
+    if (!amount || amount <= 0) return;
+    const payload = {
+      date: dateInput.value,
+      type: currentType,
+      desc: descInput.value.trim(),
+      amount: amount
+    };
+    const res = await fetch('/api/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 401) {
+      showLogin();
+      return;
+    }
+    const saved = await res.json();
+    entries.push(saved);
+    descInput.value = '';
+    amountInput.value = '';
+    closeSheet();
+    render();
+  });
+
+  filterType.addEventListener('change', render);
+  filterMonth.addEventListener('change', render);
+
+  exportBtn.addEventListener('click', () => {
+    const rows = [['Date', 'Type', 'Description', 'Amount']];
+    for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
+      rows.push([e.date, e.type === 'income' ? 'Received' : 'Expense', e.desc, e.amount.toFixed(2)]);
+    }
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'money_crm_export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  checkAuth();
+</script>
+</body>
+</html>
