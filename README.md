@@ -33,11 +33,11 @@ APP_USERS=Jo:1234,Maria:5678
 Each person logs in with their own PIN, and every transaction now shows who entered it. On Render: go to your service → **Environment** → add `APP_USERS` → save (this triggers a redeploy).
 5. Deploy. Render gives you a URL like `https://money-crm-xxxx.onrender.com` — that works from any phone or computer, anywhere.
 
-Note: Render's free tier spins the service down after inactivity, so the first request after idling takes ~30-50s to wake up. Data is stored in a file (`data.json`) on the server's disk, which persists across restarts but is wiped on redeploys — use the Export/Import CSV buttons in the app to back up and restore around a deploy, or set up Google Sheets sync below for an automatic live backup.
+Note: Render's free tier spins the service down after inactivity, so the first request after idling takes ~30-50s to wake up. By default, data is stored in files (`data.json`, `users.json`) on the server's disk — Render's free plan wipes those on every redeploy or restart. **Set up Google Sheets sync below to make your data (and logins) permanent.**
 
-### Google Sheets sync (optional)
+### Google Sheets sync (recommended — makes data permanent)
 
-Every transaction you add can also be automatically appended as a row in a Google Sheet, as a live backup outside the app.
+When configured, Google Sheets becomes the actual source of truth for both transactions and user logins, instead of the local files — so nothing is lost when Render redeploys or restarts the service. The app automatically creates two tabs in your sheet (`Entries` and `Users`) and keeps them in sync as you use the app. The first time it connects to a sheet, it also migrates in whatever's currently in your local `data.json`/`users.json`, so existing data (like your current users) carries over.
 
 1. Go to https://console.cloud.google.com and create a project (or use an existing one).
 2. In that project, go to **APIs & Services → Library**, search for **Google Sheets API**, and click **Enable**.
@@ -50,7 +50,8 @@ Every transaction you add can also be automatically appended as a row in a Googl
    - `GOOGLE_SERVICE_ACCOUNT_EMAIL` — the `client_email` value
    - `GOOGLE_PRIVATE_KEY` — the `private_key` value (paste it exactly as it appears in the JSON, including the `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` lines)
    - `GOOGLE_SHEET_ID` — the Sheet ID from step 7
-   - `GOOGLE_SHEET_NAME` — optional, the tab name to write to (defaults to `Sheet1`)
-9. Save — Render redeploys automatically. From then on, every new transaction appends a row: Date, Type, Description, Amount, Entered By, Timestamp.
+   - `GOOGLE_SHEET_NAME` — optional, tab name for transactions (defaults to `Entries`)
+   - `GOOGLE_USERS_SHEET_NAME` — optional, tab name for logins (defaults to `Users`)
+9. Save — Render redeploys automatically. Check the deploy logs for `Google Sheets sync ready` to confirm it connected. From then on, every transaction and every user change (add/edit/remove) is read from and written straight to the sheet.
 
-If these variables aren't set, the app works exactly as before — Sheets sync is entirely optional.
+If these variables aren't set, or the sheet can't be reached at startup, the app falls back to local files and works exactly as before (with the same data-loss-on-redeploy caveat).
