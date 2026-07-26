@@ -4,11 +4,25 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_FILE = path.join(__dirname, 'data.json');
-const PIN = process.env.APP_PIN || '1234';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-production';
 
-if (!process.env.APP_PIN) {
-  console.warn('WARNING: APP_PIN env var not set — using default PIN "1234". Set APP_PIN before deploying publicly.');
+// APP_USERS format: "Name1:pin1,Name2:pin2". Falls back to APP_PIN (single user "You") for compatibility.
+function loadUsers() {
+  if (process.env.APP_USERS) {
+    const users = new Map();
+    for (const pair of process.env.APP_USERS.split(',')) {
+      const [name, pin] = pair.split(':').map(s => s && s.trim());
+      if (name && pin) users.set(pin, name);
+    }
+    if (users.size) return users;
+  }
+  return new Map([[process.env.APP_PIN || '1234', 'You']]);
+}
+
+const USERS = loadUsers();
+
+if (!process.env.APP_USERS && !process.env.APP_PIN) {
+  console.warn('WARNING: APP_USERS/APP_PIN env var not set — using default PIN "1234". Set these before deploying publicly.');
 }
 
 const app = express();
@@ -45,9 +59,11 @@ function requireAuth(req, res, next) {
 
 app.post('/api/login', (req, res) => {
   const { pin } = req.body || {};
-  if (typeof pin === 'string' && pin === PIN) {
+  const name = typeof pin === 'string' ? USERS.get(pin) : undefined;
+  if (name) {
     req.session.authenticated = true;
-    return res.json({ ok: true });
+    req.session.userName = name;
+    return res.json({ ok: true, userName: name });
   }
   return res.status(401).json({ error: 'invalid pin' });
 });
@@ -57,7 +73,8 @@ app.post('/api/logout', (req, res) => {
 });
 
 app.get('/api/me', (req, res) => {
-  res.json({ authenticated: !!(req.session && req.session.authenticated) });
+  const authenticated = !!(req.session && req.session.authenticated);
+  res.json({ authenticated, userName: authenticated ? req.session.userName : null });
 });
 
 app.get('/api/entries', requireAuth, (req, res) => {
@@ -76,7 +93,8 @@ app.post('/api/entries', requireAuth, (req, res) => {
     date: String(date),
     type,
     desc: String(desc).slice(0, 200),
-    amount: amt
+    amount: amt,
+    enteredBy: req.session.userName || 'You'
   };
   entries.push(entry);
   saveEntries(entries);

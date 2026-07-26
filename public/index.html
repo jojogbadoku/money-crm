@@ -398,7 +398,7 @@
   <header>
     <div>
       <h1>Money CRM</h1>
-      <p class="subtitle">Track daily money received and expenses</p>
+      <p class="subtitle" id="subtitle">Track daily money received and expenses</p>
     </div>
     <button class="logout-btn" id="logoutBtn">Log out</button>
   </header>
@@ -476,6 +476,7 @@
   const appEl = document.getElementById('app');
   const fabBtn = document.getElementById('fabBtn');
   const logoutBtn = document.getElementById('logoutBtn');
+  const subtitle = document.getElementById('subtitle');
 
   const form = document.getElementById('entryForm');
   const dateInput = document.getElementById('date');
@@ -501,7 +502,7 @@
     const res = await fetch('/api/me');
     const data = await res.json();
     if (data.authenticated) {
-      showApp();
+      showApp(data.userName);
     } else {
       showLogin();
     }
@@ -514,10 +515,11 @@
     pinInput.focus();
   }
 
-  async function showApp() {
+  async function showApp(userName) {
     loginScreen.classList.add('hidden');
     appEl.classList.add('visible');
     fabBtn.style.display = 'flex';
+    subtitle.textContent = userName ? `Logged in as ${userName}` : 'Track daily money received and expenses';
     await fetchEntries();
   }
 
@@ -530,8 +532,9 @@
       body: JSON.stringify({ pin: pinInput.value })
     });
     if (res.ok) {
+      const data = await res.json();
       pinInput.value = '';
-      showApp();
+      showApp(data.userName);
     } else {
       loginError.textContent = 'Incorrect PIN, try again.';
       pinInput.value = '';
@@ -599,7 +602,7 @@
         <div class="icon">${e.type === 'income' ? '↓' : '↑'}</div>
         <div class="info">
           <div class="desc">${escapeHtml(e.desc)}</div>
-          <div class="date">${e.date}</div>
+          <div class="date">${e.date}${e.enteredBy ? ' · ' + escapeHtml(e.enteredBy) : ''}</div>
         </div>
         <div class="amount">${e.type === 'income' ? '+' : '-'}${formatCurrency(e.amount)}</div>
         <button class="del-btn" title="Delete" data-id="${e.id}">✕</button>

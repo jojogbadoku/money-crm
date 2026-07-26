@@ -21,6 +21,16 @@ Open http://localhost:3000 and enter your PIN.
 4. Under **Environment**, set:
    - `APP_PIN` — the PIN you'll type to unlock the app (pick something only you know).
    - `SESSION_SECRET` is generated automatically by `render.yaml`.
+
+### Adding a second person
+
+To give someone else their own login (same shared data), set an `APP_USERS` environment variable instead of/in addition to `APP_PIN`, formatted as `Name1:pin1,Name2:pin2`, e.g.:
+
+```
+APP_USERS=Jo:1234,Maria:5678
+```
+
+Each person logs in with their own PIN, and every transaction now shows who entered it. On Render: go to your service → **Environment** → add `APP_USERS` → save (this triggers a redeploy).
 5. Deploy. Render gives you a URL like `https://money-crm-xxxx.onrender.com` — that works from any phone or computer, anywhere.
 
 Note: Render's free tier spins the service down after inactivity, so the first request after idling takes ~30-50s to wake up. Data is stored in a file (`data.json`) on the server's disk, which persists across restarts but is wiped on redeploys — fine for personal use, but if that matters to you later, ask to upgrade this to a real database.
