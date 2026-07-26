@@ -43,15 +43,18 @@ When configured, Google Sheets becomes the actual source of truth for both trans
 2. In that project, go to **APIs & Services → Library**, search for **Google Sheets API**, and click **Enable**.
 3. Go to **APIs & Services → Credentials → Create Credentials → Service Account**. Give it any name, click through the defaults, and create it.
 4. Open the service account you just created → **Keys** tab → **Add Key → Create new key → JSON**. This downloads a `.json` file — keep it private, it's a credential.
-5. Open that JSON file. You'll need two values from it: `client_email` and `private_key`.
+5. Open that JSON file in a text editor — you'll need `client_email` from it in a moment, and the whole file itself.
 6. Create a new Google Sheet (or use an existing one) at https://sheets.google.com. Click **Share**, and share it with the `client_email` address from the JSON file, giving it **Editor** access.
 7. Copy the Sheet's ID from its URL — it's the long string between `/d/` and `/edit`, e.g. `https://docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`.
-8. On Render, go to your service → **Environment**, and add:
-   - `GOOGLE_SERVICE_ACCOUNT_EMAIL` — the `client_email` value
-   - `GOOGLE_PRIVATE_KEY` — the `private_key` value (paste it exactly as it appears in the JSON, including the `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` lines)
-   - `GOOGLE_SHEET_ID` — the Sheet ID from step 7
-   - `GOOGLE_SHEET_NAME` — optional, tab name for transactions (defaults to `Entries`)
-   - `GOOGLE_USERS_SHEET_NAME` — optional, tab name for logins (defaults to `Users`)
+8. On Render, go to your service → **Environment**:
+   - Under **Secret Files**, click **Add file**, name it `gcp-service-account.json`, and paste the *entire contents* of the downloaded JSON file as-is (don't extract individual fields — this avoids formatting mistakes with the private key). Save.
+   - Under **Environment Variables**, add:
+     - `GOOGLE_APPLICATION_CREDENTIALS` — `/etc/secrets/gcp-service-account.json` (where Render mounts secret files)
+     - `GOOGLE_SHEET_ID` — the Sheet ID from step 7
+     - `GOOGLE_SHEET_NAME` — optional, tab name for transactions (defaults to `Entries`)
+     - `GOOGLE_USERS_SHEET_NAME` — optional, tab name for logins (defaults to `Users`)
 9. Save — Render redeploys automatically. Check the deploy logs for `Google Sheets sync ready` to confirm it connected. From then on, every transaction and every user change (add/edit/remove) is read from and written straight to the sheet.
+
+(Alternatively, you can skip the secret file and set `GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_PRIVATE_KEY` directly as env vars — but pasting a multi-line private key into a single env var field is easy to get wrong, so the secret file above is the more reliable route.)
 
 If these variables aren't set, or the sheet can't be reached at startup, the app falls back to local files and works exactly as before (with the same data-loss-on-redeploy caveat).

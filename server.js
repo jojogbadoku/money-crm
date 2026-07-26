@@ -11,18 +11,38 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-production';
 const ENTRIES_SHEET = process.env.GOOGLE_SHEET_NAME || 'Entries';
 const USERS_SHEET = process.env.GOOGLE_USERS_SHEET_NAME || 'Users';
 
+// Credentials can come from a full service-account JSON key file (recommended —
+// point GOOGLE_APPLICATION_CREDENTIALS at a Render "Secret File" containing it,
+// so there's no manual copy-pasting of the private key to get wrong), or from
+// GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY env vars directly.
+function loadServiceAccountCredentials() {
+  const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (keyFile) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+      return { email: parsed.client_email, key: parsed.private_key };
+    } catch (err) {
+      console.error(`Could not read service account key file at ${keyFile}:`, err.message);
+      return null;
+    }
+  }
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_PRIVATE_KEY;
+  if (email && key) return { email, key: key.replace(/\\n/g, '\n') };
+  return null;
+}
+
 // When configured, Google Sheets is the durable source of truth for both
 // entries and users (survives Render redeploys/restarts, which wipe local
 // files). Falls back to local JSON files when unconfigured, or if the sheet
 // can't be reached at startup.
 function getSheetsClient() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_PRIVATE_KEY;
   const sheetId = process.env.GOOGLE_SHEET_ID;
-  if (!email || !key || !sheetId) return null;
+  const creds = loadServiceAccountCredentials();
+  if (!sheetId || !creds) return null;
   const auth = new google.auth.JWT({
-    email,
-    key: key.replace(/\\n/g, '\n'),
+    email: creds.email,
+    key: creds.key,
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
   });
   return { sheets: google.sheets({ version: 'v4', auth }), sheetId };
