@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Money CRM — Daily Received &amp; Expenses</title>
+<title>John's Farm — Daily Received &amp; Expenses</title>
+<link rel="icon" href="logo.png">
 <style>
   :root {
     --bg: #f5f6f8;
@@ -162,6 +163,9 @@
     vertical-align: middle;
   }
   .badge.income { background: var(--income-bg); color: var(--income); }
+  .badge.expense { background: var(--expense-bg); color: var(--expense); }
+  .user-stat-amounts { text-align: right; line-height: 1.5; flex: none; }
+  .user-stat-amounts .amount { font-size: 0.82rem; display: block; }
 
   .filters {
     display: flex;
@@ -393,6 +397,23 @@
     box-shadow: var(--shadow);
     text-align: center;
   }
+  .login-logo {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 14px;
+    box-shadow: var(--shadow);
+  }
+  .header-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: none;
+  }
+  .header-title { display: flex; align-items: center; gap: 10px; }
   .login-card h1 { font-size: 1.2rem; margin: 0 0 4px; }
   .login-card p { color: var(--muted); font-size: 0.85rem; margin: 0 0 20px; }
   .login-card input {
@@ -430,7 +451,8 @@
 
 <div class="login-screen" id="loginScreen">
   <div class="login-card">
-    <h1>Money CRM</h1>
+    <img src="logo.png" alt="John's Farm" class="login-logo">
+    <h1>John's Farm</h1>
     <p>Enter your PIN to continue</p>
     <form id="loginForm">
       <input type="password" id="pinInput" inputmode="numeric" autocomplete="off" placeholder="••••" required>
@@ -442,9 +464,12 @@
 
 <div class="app" id="app">
   <header>
-    <div>
-      <h1>Money CRM</h1>
-      <p class="subtitle" id="subtitle">Track daily money received and expenses</p>
+    <div class="header-title">
+      <img src="logo.png" alt="John's Farm" class="header-logo">
+      <div>
+        <h1>John's Farm</h1>
+        <p class="subtitle" id="subtitle">Track daily money received and expenses</p>
+      </div>
     </div>
     <button class="logout-btn" id="logoutBtn">Log out</button>
   </header>
@@ -490,7 +515,10 @@
   </div>
 
   <div id="usersView" style="display:none;">
-    <div class="section-title">Users</div>
+    <div class="section-title">Activity by User</div>
+    <div class="list" id="userStatsList"></div>
+
+    <div class="section-title">Manage Users</div>
     <div class="list" id="usersList"></div>
     <div class="empty" id="usersEmptyState" style="display:none;">No users yet.</div>
   </div>
@@ -585,6 +613,7 @@
   const usersView = document.getElementById('usersView');
   const usersList = document.getElementById('usersList');
   const usersEmptyState = document.getElementById('usersEmptyState');
+  const userStatsList = document.getElementById('userStatsList');
   const userSheet = document.getElementById('userSheet');
   const userSheetTitle = document.getElementById('userSheetTitle');
   const userForm = document.getElementById('userForm');
@@ -898,6 +927,49 @@
     }
     users = await res.json();
     renderUsers();
+    renderUserStats();
+  }
+
+  function renderUserStats() {
+    const statsMap = new Map();
+    for (const e of entries) {
+      const key = e.enteredBy || 'Unknown';
+      if (!statsMap.has(key)) statsMap.set(key, { received: 0, expenses: 0, count: 0 });
+      const s = statsMap.get(key);
+      if (e.type === 'income') s.received += e.amount; else s.expenses += e.amount;
+      s.count++;
+    }
+
+    const rows = users.map(u => ({
+      name: u.name,
+      role: u.role,
+      removed: false,
+      stats: statsMap.get(u.name) || { received: 0, expenses: 0, count: 0 }
+    }));
+    for (const [name, stats] of statsMap.entries()) {
+      if (!users.some(u => u.name === name)) {
+        rows.push({ name, role: null, removed: true, stats });
+      }
+    }
+    rows.sort((a, b) => b.stats.count - a.stats.count);
+
+    userStatsList.innerHTML = '';
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="icon">👤</div>
+        <div class="info">
+          <div class="desc">${escapeHtml(r.name)}${r.role === 'admin' ? ' <span class="badge income">Admin</span>' : ''}${r.removed ? ' <span class="badge expense">Removed</span>' : ''}</div>
+          <div class="date">${r.stats.count} transaction${r.stats.count === 1 ? '' : 's'}</div>
+        </div>
+        <div class="user-stat-amounts">
+          <span class="amount income">+${formatCurrency(r.stats.received)}</span>
+          <span class="amount expense">-${formatCurrency(r.stats.expenses)}</span>
+        </div>
+      `;
+      userStatsList.appendChild(row);
+    }
   }
 
   function renderUsers() {
