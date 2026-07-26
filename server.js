@@ -2,10 +2,61 @@ const express = require('express');
 const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
+const { google } = require('googleapis');
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-production';
+
+// Optional: auto-append each transaction to a Google Sheet as a live backup.
+// Configure GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SHEET_ID
+// (and optionally GOOGLE_SHEET_NAME) to enable. Silently does nothing if unset.
+function getSheetsClient() {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_PRIVATE_KEY;
+  const sheetId = process.env.GOOGLE_SHEET_ID;
+  if (!email || !key || !sheetId) return null;
+  const auth = new google.auth.JWT({
+    email,
+    key: key.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
+  });
+  return {
+    sheets: google.sheets({ version: 'v4', auth }),
+    sheetId,
+    sheetName: process.env.GOOGLE_SHEET_NAME || 'Sheet1'
+  };
+}
+
+const sheetsEnabled = !!getSheetsClient();
+if (!sheetsEnabled) {
+  console.warn('Google Sheets sync not configured (set GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SHEET_ID to enable).');
+}
+
+async function appendEntryToSheet(entry) {
+  const client = getSheetsClient();
+  if (!client) return;
+  try {
+    await client.sheets.spreadsheets.values.append({
+      spreadsheetId: client.sheetId,
+      range: `${client.sheetName}!A:F`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [[
+          entry.date,
+          entry.type === 'income' ? 'Received' : 'Expense',
+          entry.desc,
+          entry.amount,
+          entry.enteredBy,
+          new Date(entry.id).toISOString()
+        ]]
+      }
+    });
+  } catch (err) {
+    console.error('Google Sheets sync failed:', err.message);
+  }
+}
 
 // Seeds users.json on first run from APP_USERS ("Name1:pin1,Name2:pin2") or APP_PIN, for migration.
 // The first user in the list becomes admin; the rest are regular users.
@@ -133,6 +184,7 @@ app.post('/api/entries', requireAuth, (req, res) => {
   entries.push(entry);
   saveEntries(entries);
   res.status(201).json(entry);
+  appendEntryToSheet(entry);
 });
 
 app.delete('/api/entries/:id', requireAdmin, (req, res) => {
