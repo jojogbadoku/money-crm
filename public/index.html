@@ -122,6 +122,47 @@
     font-weight: 700;
   }
 
+  .tab-bar {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 14px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .row .actions { display: flex; gap: 2px; flex: none; }
+  .row .icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 1rem;
+    padding: 6px;
+    line-height: 1;
+  }
+  .row .icon-btn.danger.confirming { color: var(--expense); font-weight: 700; font-size: 0.75rem; white-space: nowrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    vertical-align: middle;
+  }
+  .badge.income { background: var(--income-bg); color: var(--income); }
+
   .filters {
     display: flex;
     gap: 8px;
@@ -280,6 +321,11 @@
     font-size: 0.9rem;
     font-weight: 600;
   }
+  .type-toggle button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
   .type-toggle button.active[data-type="income"] {
     background: var(--income-bg);
     border-color: var(--income);
@@ -403,36 +449,51 @@
     <button class="logout-btn" id="logoutBtn">Log out</button>
   </header>
 
-  <div class="summary">
-    <div class="stat balance">
-      <div class="label">Balance</div>
-      <div class="value" id="balance">0 FCFA</div>
-    </div>
-    <div class="stat-row">
-      <div class="stat received">
-        <div class="label">Received</div>
-        <div class="value" id="totalReceived">0 FCFA</div>
-      </div>
-      <div class="stat expenses">
-        <div class="label">Expenses</div>
-        <div class="value" id="totalExpenses">0 FCFA</div>
-      </div>
-    </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabTransactions" data-tab="transactions">Transactions</button>
+    <button class="tab-btn" id="tabUsers" data-tab="users">Users</button>
   </div>
 
-  <div class="section-title">Transactions</div>
-  <div class="filters">
-    <select id="filterType">
-      <option value="all">All types</option>
-      <option value="income">Received</option>
-      <option value="expense">Expenses</option>
-    </select>
-    <input type="month" id="filterMonth">
-    <button class="export" id="exportBtn" type="button">Export CSV</button>
+  <div id="transactionsView">
+    <div class="summary">
+      <div class="stat balance">
+        <div class="label">Balance</div>
+        <div class="value" id="balance">0 FCFA</div>
+      </div>
+      <div class="stat-row">
+        <div class="stat received">
+          <div class="label">Received</div>
+          <div class="value" id="totalReceived">0 FCFA</div>
+        </div>
+        <div class="stat expenses">
+          <div class="label">Expenses</div>
+          <div class="value" id="totalExpenses">0 FCFA</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Transactions</div>
+    <div class="filters">
+      <select id="filterType">
+        <option value="all">All types</option>
+        <option value="income">Received</option>
+        <option value="expense">Expenses</option>
+      </select>
+      <input type="month" id="filterMonth">
+      <button class="export" id="exportBtn" type="button">Export CSV</button>
+      <button class="export" id="importBtn" type="button">Import CSV</button>
+      <input type="file" id="importFile" accept=".csv,text/csv" style="display:none;">
+    </div>
+
+    <div class="list" id="list"></div>
+    <div class="empty" id="emptyState" style="display:none;">No transactions yet. Tap + to add one.</div>
   </div>
 
-  <div class="list" id="list"></div>
-  <div class="empty" id="emptyState" style="display:none;">No transactions yet. Tap + to add one.</div>
+  <div id="usersView" style="display:none;">
+    <div class="section-title">Users</div>
+    <div class="list" id="usersList"></div>
+    <div class="empty" id="usersEmptyState" style="display:none;">No users yet.</div>
+  </div>
 </div>
 
 <button class="fab" id="fabBtn" aria-label="Add transaction" style="display:none;"><span class="plus">+</span> Add Transaction</button>
@@ -465,6 +526,30 @@
   </form>
 </div>
 
+<div class="sheet" id="userSheet">
+  <div class="sheet-handle"></div>
+  <h2 id="userSheetTitle">Add User</h2>
+  <form id="userForm">
+    <div class="field">
+      <label for="userName">Name</label>
+      <input type="text" id="userName" placeholder="e.g. Maria" required>
+    </div>
+    <div class="field">
+      <label for="userPin" id="userPinLabel">PIN</label>
+      <input type="password" id="userPin" inputmode="numeric" placeholder="e.g. 5678">
+    </div>
+    <div class="type-toggle" id="roleToggle">
+      <button type="button" class="active" data-role="user">Regular User</button>
+      <button type="button" data-role="admin">Admin</button>
+    </div>
+    <p class="login-error" id="userFormError"></p>
+    <div class="sheet-actions">
+      <button type="button" class="btn-cancel" id="userCancelBtn">Cancel</button>
+      <button type="submit" class="btn-save">Save</button>
+    </div>
+  </form>
+</div>
+
 <script>
   let entries = [];
   let currentType = 'income';
@@ -487,10 +572,34 @@
   const filterType = document.getElementById('filterType');
   const filterMonth = document.getElementById('filterMonth');
   const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
   const overlay = document.getElementById('overlay');
   const sheet = document.getElementById('sheet');
   const cancelBtn = document.getElementById('cancelBtn');
   const typeToggle = document.getElementById('typeToggle');
+
+  const tabTransactions = document.getElementById('tabTransactions');
+  const tabUsers = document.getElementById('tabUsers');
+  const transactionsView = document.getElementById('transactionsView');
+  const usersView = document.getElementById('usersView');
+  const usersList = document.getElementById('usersList');
+  const usersEmptyState = document.getElementById('usersEmptyState');
+  const userSheet = document.getElementById('userSheet');
+  const userSheetTitle = document.getElementById('userSheetTitle');
+  const userForm = document.getElementById('userForm');
+  const userNameInput = document.getElementById('userName');
+  const userPinInput = document.getElementById('userPin');
+  const userPinLabel = document.getElementById('userPinLabel');
+  const userFormError = document.getElementById('userFormError');
+  const userCancelBtn = document.getElementById('userCancelBtn');
+  const roleToggle = document.getElementById('roleToggle');
+
+  let activeTab = 'transactions';
+  let users = [];
+  let editingUserName = null;
+  let currentRole = 'user';
+  let myRole = null;
 
   dateInput.value = new Date().toISOString().slice(0, 10);
 
@@ -502,7 +611,7 @@
     const res = await fetch('/api/me');
     const data = await res.json();
     if (data.authenticated) {
-      showApp(data.userName);
+      showApp(data.userName, data.role);
     } else {
       showLogin();
     }
@@ -515,11 +624,14 @@
     pinInput.focus();
   }
 
-  async function showApp(userName) {
+  async function showApp(userName, role) {
+    myRole = role;
     loginScreen.classList.add('hidden');
     appEl.classList.add('visible');
     fabBtn.style.display = 'flex';
-    subtitle.textContent = userName ? `Logged in as ${userName}` : 'Track daily money received and expenses';
+    subtitle.textContent = userName ? `Logged in as ${userName}${role === 'admin' ? ' (Admin)' : ''}` : 'Track daily money received and expenses';
+    tabUsers.style.display = role === 'admin' ? '' : 'none';
+    setActiveTab('transactions');
     await fetchEntries();
   }
 
@@ -534,7 +646,7 @@
     if (res.ok) {
       const data = await res.json();
       pinInput.value = '';
-      showApp(data.userName);
+      showApp(data.userName, data.role);
     } else {
       loginError.textContent = 'Incorrect PIN, try again.';
       pinInput.value = '';
@@ -547,20 +659,31 @@
     showLogin();
   });
 
-  function openSheet() {
+  let openSheetEl = null;
+
+  function openSheet(el) {
     overlay.classList.add('open');
-    sheet.classList.add('open');
+    el.classList.add('open');
+    openSheetEl = el;
     document.body.style.overflow = 'hidden';
   }
 
   function closeSheet() {
     overlay.classList.remove('open');
-    sheet.classList.remove('open');
+    if (openSheetEl) openSheetEl.classList.remove('open');
+    openSheetEl = null;
     document.body.style.overflow = '';
   }
 
-  fabBtn.addEventListener('click', openSheet);
+  fabBtn.addEventListener('click', () => {
+    if (activeTab === 'transactions') {
+      openSheet(sheet);
+    } else {
+      openUserSheetForAdd();
+    }
+  });
   cancelBtn.addEventListener('click', closeSheet);
+  userCancelBtn.addEventListener('click', closeSheet);
   overlay.addEventListener('click', closeSheet);
 
   typeToggle.addEventListener('click', (ev) => {
@@ -568,6 +691,28 @@
     if (!btn) return;
     currentType = btn.dataset.type;
     typeToggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  });
+
+  function setActiveTab(tab) {
+    activeTab = tab;
+    tabTransactions.classList.toggle('active', tab === 'transactions');
+    tabUsers.classList.toggle('active', tab === 'users');
+    transactionsView.style.display = tab === 'transactions' ? 'block' : 'none';
+    usersView.style.display = tab === 'users' ? 'block' : 'none';
+    fabBtn.innerHTML = tab === 'transactions'
+      ? '<span class="plus">+</span> Add Transaction'
+      : '<span class="plus">+</span> Add User';
+    if (tab === 'users') fetchUsers();
+  }
+
+  tabTransactions.addEventListener('click', () => setActiveTab('transactions'));
+  tabUsers.addEventListener('click', () => setActiveTab('users'));
+
+  roleToggle.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-role]');
+    if (!btn) return;
+    currentRole = btn.dataset.role;
+    roleToggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
   });
 
   async function fetchEntries() {
@@ -605,7 +750,7 @@
           <div class="date">${e.date}${e.enteredBy ? ' · ' + escapeHtml(e.enteredBy) : ''}</div>
         </div>
         <div class="amount">${e.type === 'income' ? '+' : '-'}${formatCurrency(e.amount)}</div>
-        <button class="del-btn" title="Delete" data-id="${e.id}">✕</button>
+        ${myRole === 'admin' ? `<button class="del-btn" title="Delete" data-id="${e.id}">✕</button>` : ''}
       `;
       list.appendChild(row);
     }
@@ -675,6 +820,219 @@
     a.download = 'money_crm_export.csv';
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  function parseCsvLine(line) {
+    const fields = [];
+    let field = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuotes) {
+        if (c === '"' && line[i + 1] === '"') { field += '"'; i++; }
+        else if (c === '"') { inQuotes = false; }
+        else { field += c; }
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ',') {
+        fields.push(field);
+        field = '';
+      } else {
+        field += c;
+      }
+    }
+    fields.push(field);
+    return fields;
+  }
+
+  importBtn.addEventListener('click', () => importFile.click());
+
+  importFile.addEventListener('change', async () => {
+    const file = importFile.files[0];
+    importFile.value = '';
+    if (!file) return;
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+    if (!lines.length) return;
+
+    const dataLines = /date/i.test(lines[0]) ? lines.slice(1) : lines;
+    let imported = 0;
+    let failed = 0;
+
+    for (const line of dataLines) {
+      const [date, typeLabel, desc, amount] = parseCsvLine(line);
+      const type = /received/i.test(typeLabel) ? 'income' : 'expense';
+      const amt = parseFloat(amount);
+      if (!date || !desc || !(amt > 0)) { failed++; continue; }
+
+      const res = await fetch('/api/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, type, desc, amount: amt })
+      });
+      if (res.status === 401) { showLogin(); return; }
+      if (res.ok) imported++; else failed++;
+    }
+
+    await fetchEntries();
+    emptyState.style.display = entries.length ? 'none' : 'block';
+    const prevText = emptyState.textContent;
+    emptyState.style.display = 'block';
+    emptyState.textContent = `Imported ${imported} transaction${imported === 1 ? '' : 's'}${failed ? `, ${failed} skipped` : ''}.`;
+    setTimeout(() => {
+      emptyState.textContent = prevText;
+      render();
+    }, 3000);
+  });
+
+  async function fetchUsers() {
+    const res = await fetch('/api/users');
+    if (res.status === 401) {
+      showLogin();
+      return;
+    }
+    if (res.status === 403) {
+      setActiveTab('transactions');
+      return;
+    }
+    users = await res.json();
+    renderUsers();
+  }
+
+  function renderUsers() {
+    usersList.innerHTML = '';
+    usersEmptyState.style.display = users.length ? 'none' : 'block';
+
+    for (const u of users) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="icon">👤</div>
+        <div class="info">
+          <div class="desc">${escapeHtml(u.name)}${u.role === 'admin' ? ' <span class="badge income">Admin</span>' : ''}</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" title="Edit" data-name="${escapeHtml(u.name)}" data-action="edit">✎</button>
+          <button class="icon-btn" title="Remove" data-name="${escapeHtml(u.name)}" data-action="delete">✕</button>
+        </div>
+      `;
+      usersList.appendChild(row);
+    }
+
+    usersList.querySelectorAll('[data-action="edit"]').forEach(btn => {
+      btn.addEventListener('click', () => openUserSheetForEdit(btn.dataset.name));
+    });
+
+    usersList.querySelectorAll('[data-action="delete"]').forEach(btn => {
+      btn.addEventListener('click', () => handleDeleteUserClick(btn));
+    });
+  }
+
+  function handleDeleteUserClick(btn) {
+    if (!btn.classList.contains('confirming')) {
+      btn.classList.add('confirming', 'danger');
+      btn.textContent = 'Confirm?';
+      btn._confirmTimeout = setTimeout(() => {
+        btn.classList.remove('confirming', 'danger');
+        btn.textContent = '✕';
+      }, 3000);
+      return;
+    }
+    clearTimeout(btn._confirmTimeout);
+    deleteUser(btn.dataset.name);
+  }
+
+  async function deleteUser(name) {
+    const res = await fetch(`/api/users/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    if (res.status === 401) {
+      showLogin();
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      usersEmptyState.style.display = 'block';
+      usersEmptyState.textContent = data.error || 'Could not remove user.';
+      setTimeout(() => { usersEmptyState.textContent = 'No users yet.'; renderUsers(); }, 2500);
+      return;
+    }
+    users = users.filter(u => u.name !== name);
+    renderUsers();
+  }
+
+  function setRoleToggle(role) {
+    currentRole = role;
+    roleToggle.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.role === role));
+  }
+
+  function openUserSheetForAdd() {
+    editingUserName = null;
+    userSheetTitle.textContent = 'Add User';
+    userNameInput.value = '';
+    userPinInput.value = '';
+    userPinInput.placeholder = 'e.g. 5678';
+    userPinLabel.textContent = 'PIN';
+    userFormError.textContent = '';
+    setRoleToggle('user');
+    openSheet(userSheet);
+  }
+
+  function openUserSheetForEdit(name) {
+    editingUserName = name;
+    userSheetTitle.textContent = 'Edit User';
+    userNameInput.value = name;
+    userPinInput.value = '';
+    userPinInput.placeholder = 'Leave blank to keep current PIN';
+    userPinLabel.textContent = 'New PIN (optional)';
+    userFormError.textContent = '';
+    const existing = users.find(u => u.name === name);
+    setRoleToggle(existing && existing.role === 'admin' ? 'admin' : 'user');
+    openSheet(userSheet);
+  }
+
+  userForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    userFormError.textContent = '';
+    const name = userNameInput.value.trim();
+    const pin = userPinInput.value.trim();
+    if (!name) return;
+
+    let res;
+    if (editingUserName) {
+      const payload = { newName: name, newRole: currentRole };
+      if (pin) payload.newPin = pin;
+      res = await fetch(`/api/users/${encodeURIComponent(editingUserName)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      if (!pin) {
+        userFormError.textContent = 'PIN is required.';
+        return;
+      }
+      res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, pin, role: currentRole })
+      });
+    }
+
+    if (res.status === 401) {
+      showLogin();
+      return;
+    }
+    if (res.status === 403) {
+      setActiveTab('transactions');
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      userFormError.textContent = data.error || 'Something went wrong.';
+      return;
+    }
+    closeSheet();
+    await fetchUsers();
   });
 
   checkAuth();
