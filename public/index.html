@@ -406,16 +406,16 @@
   <div class="summary">
     <div class="stat balance">
       <div class="label">Balance</div>
-      <div class="value" id="balance">$0.00</div>
+      <div class="value" id="balance">0 FCFA</div>
     </div>
     <div class="stat-row">
       <div class="stat received">
         <div class="label">Received</div>
-        <div class="value" id="totalReceived">$0.00</div>
+        <div class="value" id="totalReceived">0 FCFA</div>
       </div>
       <div class="stat expenses">
         <div class="label">Expenses</div>
-        <div class="value" id="totalExpenses">$0.00</div>
+        <div class="value" id="totalExpenses">0 FCFA</div>
       </div>
     </div>
   </div>
@@ -494,7 +494,7 @@
   dateInput.value = new Date().toISOString().slice(0, 10);
 
   function formatCurrency(n) {
-    return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return n.toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' FCFA';
   }
 
   async function checkAuth() {
